@@ -1,24 +1,28 @@
-# for local deploy
-pacman::p_load(shiny,magrittr,data.table,DT,rstudioapi,stringr,lubridate,tibble,rhandsontable)
+pacman::p_load(shiny,magrittr,data.table,DT,rstudioapi,stringr,lubridate,tibble,glue,pool)
 setwd(dirname(getSourceEditorContext()$path))
+source("db.R")
 source("global.R")
-# # for shinyapps.io
-# library(shiny)
-# library(magrittr)
-# library(data.table)
-# library(DT)
-# library(stringr)
-# library(lubridate)
-# library(tibble)
-# library(rhandsontable)
-# source("global.R")
 
 ui=fluidPage(
     h4("Dashboard - Div II"),br(),
     tabsetPanel(id="tabSet",
                 tabPanel("Task manager",br(),
-                         actionButton("add_button","",icon("plus"),style=css.button),br(),
-                         DTOutput("table")
+                         actionButton("add_button","",icon("plus"),style=css.button),br(),br(),
+                         tabsetPanel(id="tabSet2",
+                                     tabPanel(title=uiOutput("title.in_req"),
+                                              DTOutput("tbl.in_req")
+                                     ),
+                                     tabPanel("Outgoing request",
+                                              DTOutput("tbl.out_req")
+                                     ),
+                                     tabPanel("Incoming spontaneous",
+                                              DTOutput("tbl.in_spon")
+                                     ),
+                                     tabPanel("Outgoing spontaneous",
+                                              DTOutput("tbl.out_spon")
+                                     )
+                         )
+                         
                 ),
                 tabPanel("View"),
                 tabPanel("Download")
@@ -35,7 +39,7 @@ server=function(input, output,session){
         showModal(
             modalDialog(
                 fluidPage(
-                    tabsetPanel(id="tabSet2",
+                    tabsetPanel(id="tabSet3",
                                 tabPanel("Basic",br(),
                                          selectInput("add_corr","Correspondence",c("",corr_list)),
                                          selectInput("add_nature","Nature",""),
@@ -56,9 +60,13 @@ server=function(input, output,session){
                     )
                 ),
                 actionButton("add_submit","",icon("check-circle"),style=css.button),
-                easyClose=T,footer=NULL
+                fade=F,footer=NULL,easyClose=T
             )
         )
+    })
+    
+    observeEvent(input$add_close,{
+        removeModal(session)
     })
     
     observe({
@@ -83,22 +91,18 @@ server=function(input, output,session){
                              choices=crime[offence==input$add_offence,sort(law_provision)],server=T)
     })
     
-    dt=reactiveVal(data.table())
-    
     observeEvent(input$add_submit,{
-        dt_new=data.table(
-            Correspondence=input$add_corr,
-            Nature=input$add_nature,
-            Counterparty=input$add_counterparty,
-            RefNum1=input$add_refNum,
-            Date1=as.character(input$add_date),
-            RefNum2="",
-            Date2="",
-            Analyst=input$add_analyst) %>% 
-            .[Analyst=="",Update_Assign:=makeButton("assign",RefNum1)] %>%
-            .[Nature=="Incoming Request",Update_Response:=makeButton("response",RefNum1)]
-        dt_merged=rbindlist(list(dt(),dt_new),fill=T)
-        dt(dt_merged)
+        if(input$add_nature=="Incoming Request"){
+            data.table(
+                Correspondence=input$add_corr,
+                Counterparty=input$add_counterparty,
+                RefNum_external=input$add_refNum,
+                Date_received=as.character(input$add_date),
+                RefNum_internal="",
+                Date_responsed="",
+                Analyst=input$add_analyst) %>% 
+                dbWriteTable(pool,name="in_req",value=.,append=T)
+        }
         removeModal(session)
     })
     
@@ -115,10 +119,12 @@ server=function(input, output,session){
     
     observeEvent(input$response_submit,{
         row=str_replace(input$response_button,"response_","")
-        dt_new=dt()[RefNum1==row,`:=`(RefNum2=input$response_refNum,
-                                      Date2=as.character(input$response_date),
-                                      Update_Response=NA)]
-        dt(dt_new)
+        glue('UPDATE in_req 
+             SET 
+             RefNum_internal="{input$response_refNum}",
+             Date_responsed="{as.character(input$response_date)}" 
+             WHERE RefNum_external="{row}"') %>% 
+            dbExecute(pool,.)
         removeModal(session)
     })
     
@@ -134,21 +140,43 @@ server=function(input, output,session){
     
     observeEvent(input$assign_submit,{
         row=str_replace(input$assign_button,"assign_","")
-        dt_new=dt()[RefNum1==row,`:=`(Analyst=input$assign_analyst,
-                                      Update_Assign=NA)]
-        dt(dt_new)
+        glue('UPDATE in_req 
+             SET 
+             Analyst="{input$assign_analyst}" 
+             WHERE RefNum_external="{row}"') %>% 
+            dbExecute(pool,.)
         removeModal(session)
     })
     
-    tableDT=eventReactive({
-        input$assign_submit
-        input$response_submit
-        input$add_submit},{
-            dt()
-        })
+    observeEvent(input$delete_button,{
+        row=str_replace(input$delete_button,"delete_","")
+        glue('DELETE FROM in_req 
+             WHERE RefNum_external="{row}"') %>% 
+            dbExecute(pool,.)
+    })
     
-    output$table=renderDT(
-        tableDT() %>%
+    rv.in_req=eventReactive({
+        input$add_submit
+        input$response_submit
+        input$assign_submit
+        input$delete_button},{
+            data=dbReadTable(pool,"in_req") %>% 
+                setDT %>% 
+                .[Analyst=="",.ASSIGN:=sapply(RefNum_external,function(x){makeButton("assign",x,"pen")})] %>% 
+                .[Date_responsed=="",.RESPONSE:=sapply(RefNum_external,function(x){makeButton("response",x,"pen")})] %>% 
+                .[,.DELETE:=sapply(RefNum_external,function(x){makeButton("delete",x,"trash")})] %>% 
+                .[,.EDIT:=sapply(RefNum_external,function(x){makeButton("edit",x,"wrench")})]
+            return(data)
+        },ignoreNULL=F)
+    
+    output$title.in_req=renderText({
+        pending=rv.in_req()[Analyst==""|Date_responsed=="",.N]
+        data=HTML(glue("Incoming request <font color='red'> <b>({pending})</b></font>"))
+        return(data)
+    })
+    
+    output$tbl.in_req=renderDT(
+        rv.in_req() %>% 
             DT::datatable(
                 extensions="FixedHeader",
                 rownames=F,
@@ -165,4 +193,3 @@ server=function(input, output,session){
 }
 
 shinyApp(ui=ui,server=server)
-#rsconnect::deployApp(dirname(rstudioapi::getSourceEditorContext()$path),launch.browser=F,forceUpdate=T)

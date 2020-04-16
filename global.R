@@ -49,10 +49,11 @@ genRandom=function(){
     round(0) %>% 
     as.character
 }
-makeButton=function(type,ref){
+makeButton=function(type,ref,Icon){
   js=paste0('Shiny.setInputValue(\"',type,'_button\",this.id,{priority:"event"})')
   paste0(type,"_",ref) %>% 
-    actionButton(.,label="",icon("pen"),style=css.button,onclick=js) %>% 
+    actionButton(.,label="",icon(Icon),style=css.button,onclick=js) %>% 
     as.character
 }
-css.button="color: #fff; background-color: #337ab7; border-color: #2e6da4"
+css.button="color: #fff; background-color: #337ab7; border-color: #2e6da4;"
+pool=dbPool(drv=RSQLite::SQLite(),dbname="data.sqlite")
