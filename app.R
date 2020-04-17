@@ -6,8 +6,11 @@ source("global.R")
 ui=fluidPage(
     h4("Dashboard - Div II"),br(),
     tabsetPanel(id="tabSet",
+                tabPanel("Add new",br(),
+                         radioButtons("add_corr","Correspondence",corr_list),
+                         radioButtons("add_nature","Nature",""),
+                         actionButton("add_button","",icon("plus"),style=css.button)),
                 tabPanel("Task manager",br(),
-                         actionButton("add_button","",icon("plus"),style=css.button),br(),br(),
                          tabsetPanel(id="tabSet2",
                                      tabPanel(title=uiOutput("title.in_req"),
                                               DTOutput("tbl.in_req")
@@ -36,33 +39,35 @@ server=function(input, output,session){
     })
     
     observeEvent(input$add_button,{
-        showModal(
-            modalDialog(
-                fluidPage(
-                    tabsetPanel(id="tabSet3",
-                                tabPanel("Basic",br(),
-                                         selectInput("add_corr","Correspondence",c("",corr_list)),
-                                         selectInput("add_nature","Nature",""),
-                                         selectInput("add_counterparty","Counterparty",""),
-                                         textInput("add_refNum","Reference No.",value=genRandom()),
-                                         dateInput("add_date","Date",value=valToday()),
-                                         selectInput("add_analyst","Analyst",c("",analyst_list)),
-                                         selectInput("add_supervisor","Supervisor",c("",supervisor_list))
-                                ),
-                                tabPanel("Crime",br(),
-                                         selectInput("add_offence","Offence",c("",sort(unique(crime$offence)))),
-                                         textInput("add_offenceDesc","Offence description"),
-                                         selectizeInput("add_law-prov","Law and provision","",width='400px',multiple=T)
-                                ),
-                                tabPanel("Intel",br(),
-                                         #names/id/accounts
-                                )
-                    )
-                ),
-                actionButton("add_submit","",icon("check-circle"),style=css.button),
-                fade=F,footer=NULL,easyClose=T
-            )
-        )
+        if(input$add_nature=="in_req"){
+            showModal(
+                modalDialog(
+                    fluidPage(
+                        tabsetPanel(id="tabSet3",
+                                    tabPanel("Meta",br(),
+                                             selectInput("add_counterparty","Counterparty",""),
+                                             textInput("add_refNum","Reference No.",value=genRandom()),
+                                             dateInput("add_date","Date",value=valToday(),format="dd-mm-yyyy"),
+                                             selectInput("add_analyst","Analyst",c("",analyst_list))
+                                    ),
+                                    tabPanel("Crime",br(),
+                                             selectInput("add_offence","Offence",c("",sort(unique(crime$offence)))),
+                                             textInput("add_offenceDesc","Offence description"),
+                                             selectizeInput("add_lawNprov","Law and provision","",width='400px',multiple=T)
+                                    ),
+                                    tabPanel("Subject",br(),
+                                             #names/id/accounts
+                                    )
+                        )
+                    ),
+                    actionButton("add_submit","",icon("check-circle"),style=css.button),
+                    fade=F,footer=NULL,easyClose=T
+                )
+            )   
+        }
+        if (input$add_corr=="Local"){updateSelectInput(session,"add_counterparty",choices=lea_list)}
+        if (input$add_corr=="ESW"){updateSelectInput(session,"add_counterparty",choices=country_list)}
+        if (input$add_corr=="Special - MLA"){updateSelectInput(session,"add_counterparty",choices=country_list)}
     })
     
     observeEvent(input$add_close,{
@@ -71,37 +76,32 @@ server=function(input, output,session){
     
     observe({
         req(input$add_corr)
-        if (input$add_corr=="Local"){
-            updateSelectInput(session,"add_nature",choices=nature_list[c(1,4)])
-            updateSelectInput(session,"add_counterparty",choices=lea_list)
-        }
-        if (input$add_corr=="ESW"){
-            updateSelectInput(session,"add_nature",choices=nature_list)
-            updateSelectInput(session,"add_counterparty",choices=country_list)
-        }
-        if (input$add_corr=="Special - MLA"){
-            updateSelectInput(session,"add_nature",choices=nature_list[1])
-            updateSelectInput(session,"add_counterparty",choices=country_list)
-        }
+        if (input$add_corr=="Local"){updateRadioButtons(session,"add_nature",choiceNames=names(nature_list[c(1,4)]),choiceValues=unname(nature_list[c(1,4)]))}
+        if (input$add_corr=="ESW"){updateRadioButtons(session,"add_nature",choiceNames=names(nature_list),choiceValues=unname(nature_list))}
+        if (input$add_corr=="Special - MLA"){updateRadioButtons(session,"add_nature",choiceNames=names(nature_list[1]),choiceValues=unname(nature_list[1]))}
     })
     
     observe({
         req(input$add_offence)
-        updateSelectizeInput(session,"add_law-prov",
+        updateSelectizeInput(session,"add_lawNprov",
                              choices=crime[offence==input$add_offence,sort(law_provision)],server=T)
     })
-    
+
     observeEvent(input$add_submit,{
-        if(input$add_nature=="Incoming Request"){
-            data.table(
-                Correspondence=input$add_corr,
-                Counterparty=input$add_counterparty,
-                RefNum_external=input$add_refNum,
-                Date_received=as.character(input$add_date),
-                RefNum_internal="",
-                Date_responsed="",
-                Analyst=input$add_analyst) %>% 
-                dbWriteTable(pool,name="in_req",value=.,append=T)
+        if(input$add_nature=="in_req"){
+            data=c(Correspondence=input$add_corr,
+              Counterparty=input$add_counterparty,
+              RefNum_external=input$add_refNum,
+              Date_received=format(input$add_date,"%d-%m-%Y"),
+              Analyst=input$add_analyst,
+              Offence=input$add_offence,
+              OffenceDesc=input$add_offenceDesc,
+              LawProv=paste0(input$add_lawNprov,collapse=","))
+            sprintf('INSERT INTO %s (%s) VALUES (%s)',
+                    input$add_nature,
+                    paste0(names(data),collapse=","),
+                    paste0(paste0("'",data,"'"),collapse=",")) %>% 
+                dbExecute(pool,.)
         }
         removeModal(session)
     })
@@ -118,12 +118,12 @@ server=function(input, output,session){
     })
     
     observeEvent(input$response_submit,{
-        row=str_replace(input$response_button,"response_","")
-        glue('UPDATE in_req 
-             SET 
-             RefNum_internal="{input$response_refNum}",
-             Date_responsed="{as.character(input$response_date)}" 
-             WHERE RefNum_external="{row}"') %>% 
+        data=c(RefNum_external=str_replace(input$response_button,"response_",""),
+               RefNum_internal=input$response_refNum,
+               Date_responsed=format(input$response_date,"%d-%m-%Y"))
+        sprintf('INSERT INTO out_resp (%s) VALUES (%s)',
+                paste0(names(data),collapse=","),
+                paste0(paste0("'",data,"'"),collapse=",")) %>% 
             dbExecute(pool,.)
         removeModal(session)
     })
@@ -140,8 +140,7 @@ server=function(input, output,session){
     
     observeEvent(input$assign_submit,{
         row=str_replace(input$assign_button,"assign_","")
-        glue('UPDATE in_req 
-             SET 
+        glue('UPDATE in_req SET 
              Analyst="{input$assign_analyst}" 
              WHERE RefNum_external="{row}"') %>% 
             dbExecute(pool,.)
@@ -160,17 +159,28 @@ server=function(input, output,session){
         input$response_submit
         input$assign_submit
         input$delete_button},{
-            data=dbReadTable(pool,"in_req") %>% 
-                setDT %>% 
-                .[Analyst=="",.ASSIGN:=sapply(RefNum_external,function(x){makeButton("assign",x,"pen")})] %>% 
-                .[Date_responsed=="",.RESPONSE:=sapply(RefNum_external,function(x){makeButton("response",x,"pen")})] %>% 
+            data=setDT(merge(dbReadTable(pool,"in_req"),dbReadTable(pool,"out_resp"),by="RefNum_external",all.x=T)) %>% 
+                .[is.na(Date_responsed),DayPassed:=as.integer(today()-dmy(Date_received))] %>% 
+                .[,`:=`(.ASSIGN=character(),.RESPONSE=character(),.DELETE=character())] %>% 
+                .[Analyst=="",.ASSIGN:=sapply(RefNum_external,function(x){makeButton("assign",x,"pen")})] %>%
+                .[is.na(Date_responsed),.RESPONSE:=sapply(RefNum_external,function(x){makeButton("response",x,"pen")})] %>%
                 .[,.DELETE:=sapply(RefNum_external,function(x){makeButton("delete",x,"trash")})] %>% 
-                .[,.EDIT:=sapply(RefNum_external,function(x){makeButton("edit",x,"wrench")})]
+                .[,.(
+                    Counterparty,
+                    RefNum_external,
+                    Date_received,
+                    DayPassed,
+                    Date_responsed,
+                    Analyst,
+                    .ASSIGN,
+                    .RESPONSE,
+                    .DELETE
+                )]
             return(data)
         },ignoreNULL=F)
     
     output$title.in_req=renderText({
-        pending=rv.in_req()[Analyst==""|Date_responsed=="",.N]
+        pending=rv.in_req()[is.na(Analyst)|is.na(Date_responsed),.N]
         data=HTML(glue("Incoming request <font color='red'> <b>({pending})</b></font>"))
         return(data)
     })

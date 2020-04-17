@@ -1,10 +1,10 @@
 corr_list=c("Local",
             "ESW",
             "Special - MLA")
-nature_list=c("Incoming Request",
-              "Outgoing Request",
-              "Incoming Spontaneous",
-              "Outgoing Spontaneous") %>% 
+nature_list=c(`Incoming Request`="in_req",
+              `Outgoing Request`="out_req",
+              `Incoming Spontaneous`="in_spon",
+              `Outgoing Spontaneous`="out_spon") %>% 
   sort
 lea_list=c("IMI",
            "MACC",
@@ -57,3 +57,4 @@ makeButton=function(type,ref,Icon){
 }
 css.button="color: #fff; background-color: #337ab7; border-color: #2e6da4;"
 pool=dbPool(drv=RSQLite::SQLite(),dbname="data.sqlite")
+
