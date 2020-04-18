@@ -1,6 +1,7 @@
-corr_list=c("Local",
-            "ESW",
-            "Special - MLA")
+corr_list=c("Local LEA",
+            "Foreign FIU",
+            "Special - MLA",
+            "Special - CV")
 nature_list=c(`Incoming Request`="in_req",
               `Outgoing Request`="out_req",
               `Incoming Spontaneous`="in_spon",

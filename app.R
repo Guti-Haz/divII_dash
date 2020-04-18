@@ -1,4 +1,5 @@
-pacman::p_load(shiny,magrittr,data.table,DT,rstudioapi,stringr,lubridate,tibble,glue,pool,rhandsontable)
+pacman::p_load(shiny,magrittr,data.table,DT,rstudioapi,stringr,lubridate,tibble,
+               glue,pool,rhandsontable,DBI,RSQLite)
 setwd(dirname(rstudioapi::getSourceEditorContext()$path))
 
 # library(shiny)
@@ -79,22 +80,21 @@ server=function(input, output,session){
                 )
             )   
         }
-        if (input$add_corr=="Local"){updateSelectInput(session,"add_counterparty",choices=lea_list)}
-        if (input$add_corr=="ESW"){updateSelectInput(session,"add_counterparty",choices=country_list)}
+        if (input$add_corr=="Local LEA"){updateSelectInput(session,"add_counterparty",choices=lea_list)}
+        if (input$add_corr=="Foreign FIU"){updateSelectInput(session,"add_counterparty",choices=country_list)}
         if (input$add_corr=="Special - MLA"){updateSelectInput(session,"add_counterparty",choices=country_list)}
-    })
-    
-    output$add_subject=renderRHandsontable({
-        rhandsontable(
-            data.table(
-                Type_Natural=T,
-                Type_Legal=F,
-                Name="",
-                ID="",
-                Account=""),
-            fillHandle=list(direction='vertical',autoInsertRow=T),
-            rowHeaderWidth=c(30,30,100,100,100)
-        )
+        output$add_subject=renderRHandsontable({
+            rhandsontable(
+                data.table(
+                    Type_Natural=T,
+                    Type_Legal=F,
+                    Name="",
+                    ID="",
+                    Account=""),
+                fillHandle=list(direction='vertical',autoInsertRow=T),
+                rowHeaderWidth=c(30,30,100,100,100)
+            )
+        })
     })
     
     observeEvent(input$add_close,{
@@ -103,8 +103,8 @@ server=function(input, output,session){
     
     observe({
         req(input$add_corr)
-        if (input$add_corr=="Local"){updateRadioButtons(session,"add_nature",choiceNames=names(nature_list[c(1,4)]),choiceValues=unname(nature_list[c(1,4)]))}
-        if (input$add_corr=="ESW"){updateRadioButtons(session,"add_nature",choiceNames=names(nature_list),choiceValues=unname(nature_list))}
+        if (input$add_corr=="Local LEA"){updateRadioButtons(session,"add_nature",choiceNames=names(nature_list[c(1,4)]),choiceValues=unname(nature_list[c(1,4)]))}
+        if (input$add_corr=="Foreign FIU"){updateRadioButtons(session,"add_nature",choiceNames=names(nature_list),choiceValues=unname(nature_list))}
         if (input$add_corr=="Special - MLA"){updateRadioButtons(session,"add_nature",choiceNames=names(nature_list[1]),choiceValues=unname(nature_list[1]))}
     })
 
@@ -161,25 +161,24 @@ server=function(input, output,session){
                 actionButton("response_submit","",icon("check-circle"),style=css.button),
                 fade=F,footer=NULL,easyClose=T,size="l"
             )
-        )  
+        )
+        output$response_subject=renderRHandsontable({
+            data=setDT(dbReadTable(pool,"subject")) %>% 
+                .[RefNum_external==str_replace(input$response_button,"response_","")] %>% 
+                adjDBtoType %>% 
+                .[,.(Type_Natural,Type_Legal,Name,ID,Account)]
+            rhandsontable(
+                data,
+                fillHandle=list(direction='vertical',autoInsertRow=T),
+                rowHeaderWidth=c(30,30,100,100,100)
+            )
+        })
     })
     
     observe({
         req(input$response_offence)
         updateSelectizeInput(session,"response_lawNprov",
                              choices=crime[offence==input$response_offence,sort(law_provision)],server=T)
-    })
-    
-    output$response_subject=renderRHandsontable({
-        data=setDT(dbReadTable(pool,"subject")) %>% 
-            .[RefNum_external==str_replace(input$response_button,"response_","")] %>% 
-            adjDBtoType %>% 
-            .[,.(Type_Natural,Type_Legal,Name,ID,Account)]
-        rhandsontable(
-            data,
-            fillHandle=list(direction='vertical',autoInsertRow=T),
-            rowHeaderWidth=c(30,30,100,100,100)
-        )
     })
     
     observeEvent(input$response_submit,{
@@ -240,18 +239,17 @@ server=function(input, output,session){
         input$assign_submit
         input$delete_button},{
             data=setDT(merge(dbReadTable(pool,"in_req"),dbReadTable(pool,"out_resp"),by="RefNum_external",all.x=T)) %>% 
-                .[is.na(Date_responsed),DayPassed:=as.integer(today()-dmy(Date_received))] %>% 
-                .[,`:=`(.ASSIGN=character(),.RESPONSE=character(),.DELETE=character())] %>% 
-                .[Analyst=="",.ASSIGN:=sapply(RefNum_external,function(x){makeButton("assign",x,"pen")})] %>%
-                .[is.na(Date_responsed),.RESPONSE:=sapply(RefNum_external,function(x){makeButton("response",x,"pen")})] %>%
+                .[is.na(Date_responsed),Status:=paste0("Pending - ",as.integer(today()-dmy(Date_received))," days elapsed")] %>% 
+                .[,.ASSIGN:=sapply(RefNum_external,function(x){makeButton("assign",x,"pen")})] %>%
+                .[,.RESPONSE:=sapply(RefNum_external,function(x){makeButton("response",x,"pen")})] %>%
                 .[,.DELETE:=sapply(RefNum_external,function(x){makeButton("delete",x,"trash")})] %>% 
                 .[,.(
                     Counterparty,
                     RefNum_external,
                     Date_received,
-                    DayPassed,
                     Date_responsed,
                     Analyst,
+                    Status,
                     .ASSIGN,
                     .RESPONSE,
                     .DELETE

@@ -20,7 +20,7 @@ adjTypetoDB=function(dt){
 }
 
 adjDBtoType=function(dt){
-  .data=dt[,Type_Natural:=as.logical(Type_Natural)] %>% 
+  data=dt[,Type_Natural:=as.logical(Type_Natural)] %>% 
     .[,Type_Legal:=as.logical(Type_Legal)]
   return(data)
 }
