@@ -1,7 +1,22 @@
 pacman::p_load(shiny,magrittr,data.table,DT,rstudioapi,stringr,lubridate,tibble,glue,pool,rhandsontable)
-setwd(dirname(getSourceEditorContext()$path))
+setwd(dirname(rstudioapi::getSourceEditorContext()$path))
+
+# library(shiny)
+# library(RSQLite)
+# library(DBI)
+# library(magrittr)
+# library(data.table)
+# library(DT)
+# library(stringr)
+# library(lubridate)
+# library(tibble)
+# library(glue)
+# library(pool)
+# library(rhandsontable)
+
 source("db.R")
-source("global.R")
+source("vars.R")
+source("udf.R")
 
 ui=fluidPage(
     h4("Dashboard - Div II"),br(),
@@ -108,6 +123,7 @@ server=function(input, output,session){
                     paste0(paste0("'",data,"'"),collapse=",")) %>% 
                 dbExecute(pool,.)
             data=hot_to_r(input$add_subject) %>% 
+                adjTypetoDB %>% 
                 .[,`:=`(
                     Nature=input$add_nature,
                     RefNum_external=input$add_refNum,
@@ -125,11 +141,11 @@ server=function(input, output,session){
                 fluidPage(
                     tabsetPanel(id="tabSet4",
                                 tabPanel("Meta",br(),
-                                         radioButtons("response_supervisor","Supervisor",supervisor_list),
+                                         radioButtons("response_supervisor","Supervisor",supervisor_list,inline=T),
                                          textInput("response_refNum","Reference No.",value=genRandom()),
                                          dateInput("response_date","Date",value=valToday(),format="dd-mm-yyyy"),
                                          textInput("response_wf","Workfile",value=glue("WF/{year(valToday())}/0000")),
-                                         radioButtons("response_complexity","Complexity",complexity_list),
+                                         radioButtons("response_complexity","Complexity",complexity_list,inline=T),
                                          selectizeInput("response_otherInfo","Other info disclosed",otherInfo_list,width='400px',multiple=T)
                                 ),
                                 tabPanel("Crime",br(),
@@ -157,6 +173,7 @@ server=function(input, output,session){
     output$response_subject=renderRHandsontable({
         data=setDT(dbReadTable(pool,"subject")) %>% 
             .[RefNum_external==str_replace(input$response_button,"response_","")] %>% 
+            adjDBtoType %>% 
             .[,.(Type_Natural,Type_Legal,Name,ID,Account)]
         rhandsontable(
             data,
@@ -166,13 +183,28 @@ server=function(input, output,session){
     })
     
     observeEvent(input$response_submit,{
-        data=c(RefNum_external=str_replace(input$response_button,"response_",""),
+        data=c(Supervisor=input$response_supervisor,
+               Workfile=input$response_wf,
+               Complexity=input$response_complexity,
+               OtherInfo=paste0(input$response_otherInfo,collapse=","),
+               Offence=input$response_offence,
+               OffenceDesc=input$response_offenceDesc,
+               Law_Prov=paste0(input$response_lawNprov,collapse=","),
+               RefNum_external=str_replace(input$response_button,"response_",""),
                RefNum_internal=input$response_refNum,
                Date_responsed=format(input$response_date,"%d-%m-%Y"))
         sprintf('INSERT INTO out_resp (%s) VALUES (%s)',
                 paste0(names(data),collapse=","),
                 paste0(paste0("'",data,"'"),collapse=",")) %>% 
             dbExecute(pool,.)
+        data=hot_to_r(input$response_subject) %>% 
+            .[,`:=`(
+                Nature="out_resp",
+                RefNum_external=str_replace(input$response_button,"response_",""),
+                RefNum_internal=input$response_refNum
+            )] %>% 
+            .[!(is.na(Name)&is.na(ID)&is.na(Account))]
+        dbWriteTable(pool,"subject",data,append=T)
         removeModal(session)
     })
     
@@ -251,3 +283,4 @@ server=function(input, output,session){
 }
 
 shinyApp(ui=ui,server=server)
+# rsconnect::deployApp()
