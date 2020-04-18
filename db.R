@@ -3,6 +3,20 @@ setwd(dirname(rstudioapi::getSourceEditorContext()$path))
 # create conn
 conn=dbConnect(SQLite(),"data.sqlite")
 # create table
+## subject ----
+tblName="subject"
+if(dbExistsTable(conn,tblName)){
+  dbRemoveTable(conn,tblName)
+}
+c(Nature="TEXT",
+  RefNum_external="TEXT",
+  RefNum_internal="TEXT",
+  Type_Natural="TEXT",
+  Type_Legal="TEXT",
+  Name="TEXT",
+  ID="TEXT",
+  Account="TEXT") %>% 
+  dbCreateTable(conn,tblName,.)
 ## in_req ----
 tblName="in_req"
 if(dbExistsTable(conn,tblName)){

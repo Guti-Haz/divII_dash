@@ -19,10 +19,10 @@ country_list=c("Nigeria",
                "Bhutan") %>% 
   sort
 analyst_list=c("MFF",
-              "NHZ",
-              "THL",
-              "AFA",
-              "MNAK") %>% 
+               "NHZ",
+               "THL",
+               "AFA",
+               "MNAK") %>% 
   sort
 supervisor_list=c("ALBA",
                   "LHH",
@@ -43,6 +43,15 @@ offence_list=c("Fraud",
                "Tax evasion",
                "Terrorism financing",
                "Proliferation financing") %>% 
+  sort
+complexity_list=c("Simple",
+                  "Bulk",
+                  "Complex")%>% 
+  sort
+otherInfo_list=c("ITIS",
+                 "Account statement",
+                 "Credit info",
+                 "Remittances")%>% 
   sort
 genRandom=function(){
   runif(1,1e7,1e8) %>% 

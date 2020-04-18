@@ -1,4 +1,4 @@
-pacman::p_load(shiny,magrittr,data.table,DT,rstudioapi,stringr,lubridate,tibble,glue,pool)
+pacman::p_load(shiny,magrittr,data.table,DT,rstudioapi,stringr,lubridate,tibble,glue,pool,rhandsontable)
 setwd(dirname(getSourceEditorContext()$path))
 source("db.R")
 source("global.R")
@@ -52,22 +52,34 @@ server=function(input, output,session){
                                     ),
                                     tabPanel("Crime",br(),
                                              selectInput("add_offence","Offence",c("",sort(unique(crime$offence)))),
-                                             textInput("add_offenceDesc","Offence description"),
-                                             selectizeInput("add_lawNprov","Law and provision","",width='400px',multiple=T)
+                                             textInput("add_offenceDesc","Offence description")
                                     ),
                                     tabPanel("Subject",br(),
-                                             #names/id/accounts
+                                             rHandsontableOutput("add_subject")
                                     )
                         )
-                    ),
+                    ),br(),
                     actionButton("add_submit","",icon("check-circle"),style=css.button),
-                    fade=F,footer=NULL,easyClose=T
+                    fade=F,footer=NULL,easyClose=T,size="l"
                 )
             )   
         }
         if (input$add_corr=="Local"){updateSelectInput(session,"add_counterparty",choices=lea_list)}
         if (input$add_corr=="ESW"){updateSelectInput(session,"add_counterparty",choices=country_list)}
         if (input$add_corr=="Special - MLA"){updateSelectInput(session,"add_counterparty",choices=country_list)}
+    })
+    
+    output$add_subject=renderRHandsontable({
+        rhandsontable(
+            data.table(
+                Type_Natural=T,
+                Type_Legal=F,
+                Name="",
+                ID="",
+                Account=""),
+            fillHandle=list(direction='vertical',autoInsertRow=T),
+            rowHeaderWidth=c(30,30,100,100,100)
+        )
     })
     
     observeEvent(input$add_close,{
@@ -80,28 +92,29 @@ server=function(input, output,session){
         if (input$add_corr=="ESW"){updateRadioButtons(session,"add_nature",choiceNames=names(nature_list),choiceValues=unname(nature_list))}
         if (input$add_corr=="Special - MLA"){updateRadioButtons(session,"add_nature",choiceNames=names(nature_list[1]),choiceValues=unname(nature_list[1]))}
     })
-    
-    observe({
-        req(input$add_offence)
-        updateSelectizeInput(session,"add_lawNprov",
-                             choices=crime[offence==input$add_offence,sort(law_provision)],server=T)
-    })
 
     observeEvent(input$add_submit,{
         if(input$add_nature=="in_req"){
             data=c(Correspondence=input$add_corr,
-              Counterparty=input$add_counterparty,
-              RefNum_external=input$add_refNum,
-              Date_received=format(input$add_date,"%d-%m-%Y"),
-              Analyst=input$add_analyst,
-              Offence=input$add_offence,
-              OffenceDesc=input$add_offenceDesc,
-              LawProv=paste0(input$add_lawNprov,collapse=","))
+                   Counterparty=input$add_counterparty,
+                   RefNum_external=input$add_refNum,
+                   Date_received=format(input$add_date,"%d-%m-%Y"),
+                   Analyst=input$add_analyst,
+                   Offence=input$add_offence,
+                   OffenceDesc=input$add_offenceDesc)
             sprintf('INSERT INTO %s (%s) VALUES (%s)',
                     input$add_nature,
                     paste0(names(data),collapse=","),
                     paste0(paste0("'",data,"'"),collapse=",")) %>% 
                 dbExecute(pool,.)
+            data=hot_to_r(input$add_subject) %>% 
+                .[,`:=`(
+                    Nature=input$add_nature,
+                    RefNum_external=input$add_refNum,
+                    RefNum_internal=NA
+                )] %>% 
+                .[!(is.na(Name)&is.na(ID)&is.na(Account))]
+            dbWriteTable(pool,"subject",data,append=T)
         }
         removeModal(session)
     })
@@ -109,12 +122,47 @@ server=function(input, output,session){
     observeEvent(input$response_button,{
         showModal(
             modalDialog(
-                textInput("response_refNum","Reference No.",value=genRandom()),
-                dateInput("response_date","Date",value=valToday()),
+                fluidPage(
+                    tabsetPanel(id="tabSet4",
+                                tabPanel("Meta",br(),
+                                         radioButtons("response_supervisor","Supervisor",supervisor_list),
+                                         textInput("response_refNum","Reference No.",value=genRandom()),
+                                         dateInput("response_date","Date",value=valToday(),format="dd-mm-yyyy"),
+                                         textInput("response_wf","Workfile",value=glue("WF/{year(valToday())}/0000")),
+                                         radioButtons("response_complexity","Complexity",complexity_list),
+                                         selectizeInput("response_otherInfo","Other info disclosed",otherInfo_list,width='400px',multiple=T)
+                                ),
+                                tabPanel("Crime",br(),
+                                         selectInput("response_offence","Offence",c("",sort(unique(crime$offence)))),
+                                         textInput("response_offenceDesc","Offence description"),
+                                         selectizeInput("response_lawNprov","Law and provision","",width='400px',multiple=T),
+                                ),
+                                tabPanel("Subject",br(),
+                                         rHandsontableOutput("response_subject")
+                                )
+                    )
+                ),br(),
                 actionButton("response_submit","",icon("check-circle"),style=css.button),
-                easyClose=T,footer=NULL
+                fade=F,footer=NULL,easyClose=T,size="l"
             )
         )  
+    })
+    
+    observe({
+        req(input$response_offence)
+        updateSelectizeInput(session,"response_lawNprov",
+                             choices=crime[offence==input$response_offence,sort(law_provision)],server=T)
+    })
+    
+    output$response_subject=renderRHandsontable({
+        data=setDT(dbReadTable(pool,"subject")) %>% 
+            .[RefNum_external==str_replace(input$response_button,"response_","")] %>% 
+            .[,.(Type_Natural,Type_Legal,Name,ID,Account)]
+        rhandsontable(
+            data,
+            fillHandle=list(direction='vertical',autoInsertRow=T),
+            rowHeaderWidth=c(30,30,100,100,100)
+        )
     })
     
     observeEvent(input$response_submit,{
