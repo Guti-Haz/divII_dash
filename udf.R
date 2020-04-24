@@ -11,6 +11,13 @@ makeButton=function(type,ref,Icon){
     as.character
 }
 
+makeRadio=function(type,ref){
+  js=paste0('Shiny.setInputValue(\"',type,'_radio\",this.id,{priority:"event"})')
+  paste0(type,"_",ref) %>% 
+    radioButtons(.,label="",style=css.button,onclick=js) %>% 
+    as.character
+}
+
 adjTypetoDB=function(dt){
   data=dt[Type_Natural==T,Type_Natural:=1] %>% 
     .[Type_Legal==T,Type_Legal:=1] %>% 

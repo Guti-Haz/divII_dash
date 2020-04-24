@@ -1,7 +1,6 @@
 corr_list=c("Local LEA",
             "Foreign FIU",
-            "Special - MLA",
-            "Special - CV")
+            "Special - MLA")
 nature_list=c(`Incoming Request`="in_req",
               `Outgoing Request`="out_req",
               `Incoming Spontaneous`="in_spon",
@@ -54,5 +53,9 @@ otherInfo_list=c("ITIS",
                  "Credit info",
                  "Remittances")%>% 
   sort
+reason_list=c("No link to Malaysia",
+              "No personal info",
+              "No detail of transaction",
+              "Phishing")
 css.button="color: #fff; background-color: #337ab7; border-color: #2e6da4;"
 pool=dbPool(drv=RSQLite::SQLite(),dbname="data.sqlite")

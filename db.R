@@ -1,8 +1,15 @@
-# create conn
-conn=dbConnect(SQLite(),"data.sqlite")
+libs=c("RSQLite",
+       "DBI",
+       "tibble")
+lapply(libs,require,character.only=T)
+setwd(dirname(rstudioapi::getSourceEditorContext()$path))
+
+# create conn + data
+data_name="data.sqlite"
+if(file.exists(data_name)){file.remove(data_name)}
+conn=dbConnect(SQLite(),data_name)
 
 # create table
-
 ## subject ----
 tblName="subject"
 if(dbExistsTable(conn,tblName)){dbRemoveTable(conn,tblName)}
@@ -27,6 +34,17 @@ c(Correspondence="TEXT",
   Offence="TEXT",
   OffenceDesc="TEXT",
   LawProv="TEXT") %>% 
+  dbCreateTable(conn,tblName,.)
+
+## valid ----
+tblName="valid"
+if(dbExistsTable(conn,tblName)){dbRemoveTable(conn,tblName)}
+c(RefNum_external="TEXT",
+  Date_ask="TEXT",
+  Reason="TEXT",
+  Detail_inquiry="TEXT",
+  Date_reply="TEXT",
+  Detail_response="TEXT") %>% 
   dbCreateTable(conn,tblName,.)
 
 ## out_resp ----
