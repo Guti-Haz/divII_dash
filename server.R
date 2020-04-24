@@ -1,7 +1,7 @@
-#source("db.R")
 source("vars.R")
+source("db.R")
 source("udf.R")
-
+pool=dbPool(drv=RSQLite::SQLite(),dbname=data_name)
 shinyServer(function(input, output,session){
     valToday=reactive({
         invalidateLater(4.32e+7,session) #every 12 hours
@@ -42,7 +42,7 @@ shinyServer(function(input, output,session){
                 data.table(
                     Type_Natural=T,
                     Type_Legal=F,
-                    Name="Ali",
+                    Name="",
                     ID="",
                     Account=""),
                 fillHandle=list(direction='vertical',autoInsertRow=T),

@@ -1,11 +1,5 @@
-libs=c("RSQLite",
-       "DBI",
-       "tibble")
-lapply(libs,require,character.only=T)
-setwd(dirname(rstudioapi::getSourceEditorContext()$path))
 
 # create conn + data
-data_name="data.sqlite"
 if(file.exists(data_name)){file.remove(data_name)}
 conn=dbConnect(SQLite(),data_name)
 

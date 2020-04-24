@@ -58,4 +58,5 @@ reason_list=c("No link to Malaysia",
               "No detail of transaction",
               "Phishing")
 css.button="color: #fff; background-color: #337ab7; border-color: #2e6da4;"
-pool=dbPool(drv=RSQLite::SQLite(),dbname="data.sqlite")
+data_name=paste0("data_",as.character(round(runif(1,1e7,1e8),0)),".sqlite")
+
