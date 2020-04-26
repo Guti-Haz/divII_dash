@@ -1,6 +1,7 @@
 source("vars.R")
 source("db.R")
 source("udf.R")
+#pool=dbPool(drv=RSQLite::SQLite(),dbname="/Users/guti_haz/Documents/DivII_dash/data.sqlite")
 pool=dbPool(drv=RSQLite::SQLite(),dbname=data_name)
 shinyServer(function(input, output,session){
     valToday=reactive({
@@ -29,7 +30,7 @@ shinyServer(function(input, output,session){
                                     )
                         )
                     ),br(),
-                    actionButton("add_submit","",icon("check-circle"),style=css.button),
+                    uiOutput("ui_add.button"),
                     fade=F,footer=NULL,easyClose=T,size="l"
                 )
             )   
@@ -51,6 +52,18 @@ shinyServer(function(input, output,session){
         })
     })
     
+    output$ui_add.button=renderUI({
+        if(input$add_nature=="in_req"){
+            req(input$add_button,input$add_subject)
+            validate(
+                need(input$add_refNum,"Ref num is blank"),
+                need(input$add_offence,"Offence is not selected"),
+                need(hot_to_r(input$add_subject)[,Name]!="","Subject is empty")
+            )
+            actionButton("add_submit","",icon("check-circle"),style=css.button)   
+        }
+    })
+
     observeEvent(input$add_close,{
         removeModal(session)
     })
@@ -69,8 +82,8 @@ shinyServer(function(input, output,session){
                    RefNum_external=input$add_refNum,
                    Date_received=format(input$add_date,"%d-%m-%Y"),
                    Analyst=input$add_analyst,
-                   Offence=input$add_offence,
-                   OffenceDesc=input$add_offenceDesc)
+                   Offence_received=input$add_offence,
+                   OffenceDesc_received=input$add_offenceDesc)
             sprintf('INSERT INTO %s (%s) VALUES (%s)',
                     input$add_nature,
                     paste0(names(data),collapse=","),
@@ -207,9 +220,9 @@ shinyServer(function(input, output,session){
                Workfile=input$response_wf,
                Complexity=input$response_complexity,
                OtherInfo=paste0(input$response_otherInfo,collapse=","),
-               Offence=input$response_offence,
-               OffenceDesc=input$response_offenceDesc,
-               Law_Prov=paste0(input$response_lawNprov,collapse=","),
+               Offence_responsed=input$response_offence,
+               OffenceDesc_responsed=input$response_offenceDesc,
+               Law_Prov_responsed=paste0(input$response_lawNprov,collapse=","),
                RefNum_external=str_replace(input$response_button,"response_",""),
                RefNum_internal=input$response_refNum,
                Date_responsed=format(input$response_date,"%d-%m-%Y"))
@@ -248,8 +261,8 @@ shinyServer(function(input, output,session){
                 .[is.na(Date_responsed),Status:=paste0("Pending - ",as.integer(today()-dmy(Date_received))," days elapsed")] %>% 
                 .[!is.na(Date_ask)&is.na(Date_reply),Status:="Invalidated"] %>% 
                 .[,.ASSIGN:=sapply(RefNum_external,function(x){makeButton("assign",x,"pen")})] %>%
-                .[Correspondence=="Foreign FIU",.VALIDATE:=sapply(RefNum_external,function(x){makeButton("invalidate",x,"times-circle")})] %>%
-                .[Correspondence=="Foreign FIU"&!is.na(Date_ask),.VALIDATE:=sapply(RefNum_external,function(x){makeButton("revalidate",x,"check-circle")})] %>%
+                .[Correspondence=="Foreign FIU"&is.na(Date_responsed),.VALIDATE:=sapply(RefNum_external,function(x){makeButton("invalidate",x,"times-circle")})] %>%
+                .[Correspondence=="Foreign FIU"&!is.na(Date_ask)&is.na(Date_responsed),.VALIDATE:=sapply(RefNum_external,function(x){makeButton("revalidate",x,"check-circle")})] %>%
                 .[Status!="Invalidated",.RESPONSE:=sapply(RefNum_external,function(x){makeButton("response",x,"pen")})] %>%
                 .[,.DELETE:=sapply(RefNum_external,function(x){makeButton("delete",x,"trash")})] %>% 
                 .[,.(
@@ -277,7 +290,7 @@ shinyServer(function(input, output,session){
     output$tbl.in_req=renderDT(
         rv.in_req() %>% 
             DT::datatable(
-                extensions="FixedHeader",
+                extensions=c("FixedHeader","Buttons"),
                 rownames=F,
                 escape=F,
                 options=list(
@@ -285,8 +298,92 @@ shinyServer(function(input, output,session){
                     autowidth=T,
                     fixedHeader=T,
                     pageLength=1e4,
-                    dom="t"
+                    dom="FBrti",
+                    buttons=c('copy','csv','excel','pdf')
                 )
             )
     )
+    
+    rv.view_subject=eventReactive({
+        input$add_submit
+        input$response_submit},{
+            data=setDT(dbReadTable(pool,"subject")) %>% 
+                adjDBtoType %>% 
+                adjType
+            return(data)
+        },ignoreNULL=F)
+    
+    output$tbl.view.subject=renderDT(
+        rv.view_subject() %>% 
+            DT::datatable(
+                filter = 'top',
+                extensions=c("FixedHeader","Buttons"),
+                rownames=F,
+                escape=F,
+                options=list(
+                    processing=T,
+                    autowidth=T,
+                    fixedHeader=T,
+                    pageLength=1e4,
+                    dom="FBrti",
+                    buttons=c('copy','csv','excel','pdf')
+                )
+            )
+    )
+    
+    rv.view.in_req=eventReactive({
+        input$add_submit
+        input$response_submit},{
+            data=merge(dbReadTable(pool,"in_req"),
+                       dbReadTable(pool,"valid"),
+                       by="RefNum_external",all.x=T)
+            return(data)
+        },ignoreNULL=F)
+    
+    output$tbl.view.in_req=renderDT(
+        rv.view.in_req() %>% 
+            DT::datatable(
+                filter = 'top',
+                extensions=c("FixedHeader","Buttons"),
+                rownames=F,
+                escape=F,
+                options=list(
+                    processing=T,
+                    autowidth=T,
+                    fixedHeader=T,
+                    pageLength=1e4,
+                    dom="FBrti",
+                    buttons=c('copy','csv','excel','pdf')
+                )
+            )
+    )
+    
+    rv.view.in_req__Out_resp=eventReactive({
+        input$add_submit
+        input$response_submit},{
+            data=merge(dbReadTable(pool,"in_req"),
+                       dbReadTable(pool,"out_resp"),by="RefNum_external",all.x=T) %>% 
+                merge(dbReadTable(pool,"valid"),
+                      by="RefNum_external",all.x=T)
+            return(data)
+        },ignoreNULL=F)
+    
+    output$tbl.view.In_req__Out_resp=renderDT(
+        rv.view.in_req__Out_resp() %>% 
+            DT::datatable(
+                filter = 'top',
+                extensions=c("FixedHeader","Buttons"),
+                rownames=F,
+                escape=F,
+                options=list(
+                    processing=T,
+                    autowidth=T,
+                    fixedHeader=T,
+                    pageLength=1e4,
+                    dom="FBrti",
+                    buttons=c('copy','csv','excel','pdf')
+                )
+            )
+    )
+    
 })

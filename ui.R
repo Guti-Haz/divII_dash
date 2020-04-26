@@ -16,18 +16,30 @@ shinyUI(
     fluidPage(
         h4("Dashboard - Div II"),br(),
         tabsetPanel(id="tabSet",
-                    tabPanel("Add new",value="add",br(),
+                    tabPanel("Add",value="add",br(),
                              radioButtons("add_corr","Correspondence",corr_list),
                              radioButtons("add_nature","Nature",""),
                              actionButton("add_button","",icon("plus"),style=css.button)
-                             ),
-                    tabPanel("Task manager",value="task",br(),
+                    ),
+                    tabPanel("Task",value="task",br(),
                              tabsetPanel(id="tabSet2",
-                                         tabPanel(title=uiOutput("title.in_req"),
+                                         tabPanel(title=uiOutput("title.in_req"),br(),
                                                   DTOutput("tbl.in_req")
                                          )
                              )
-                             
+                    ),
+                    tabPanel("View",value="view",br(),
+                             tabsetPanel(id="tabSet3",
+                                         tabPanel("Subject",br(),
+                                                  DTOutput("tbl.view.subject")
+                                         ),
+                                         tabPanel("In_req",br(),
+                                                  DTOutput("tbl.view.in_req")
+                                         ),
+                                         tabPanel("In_req + Out_resp",br(),
+                                                  DTOutput("tbl.view.In_req__Out_resp")
+                                         )
+                             )
                     )
         )
     )

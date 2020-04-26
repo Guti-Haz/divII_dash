@@ -1,5 +1,11 @@
+libs=c("shiny",
+       "RSQLite",
+       "DBI",
+       "magrittr")
+lapply(libs,require,character.only=T)
 
 # create conn + data
+# data_name="/Users/guti_haz/Documents/DivII_dash/data.sqlite"
 if(file.exists(data_name)){file.remove(data_name)}
 conn=dbConnect(SQLite(),data_name)
 
@@ -25,9 +31,8 @@ c(Correspondence="TEXT",
   RefNum_external="TEXT",
   Date_received="TEXT",
   Analyst="TEXT",
-  Offence="TEXT",
-  OffenceDesc="TEXT",
-  LawProv="TEXT") %>% 
+  Offence_received="TEXT",
+  OffenceDesc_received="TEXT") %>% 
   dbCreateTable(conn,tblName,.)
 
 ## valid ----
@@ -48,9 +53,9 @@ c(Supervisor="TEXT",
   Workfile="TEXT",
   Complexity="TEXT",
   OtherInfo="TEXT",
-  Offence="TEXT",
-  OffenceDesc="TEXT",
-  Law_Prov="TEXT",
+  Offence_responsed="TEXT",
+  OffenceDesc_responsed="TEXT",
+  Law_Prov_responsed="TEXT",
   RefNum_external="TEXT",
   RefNum_internal="TEXT",
   Date_responsed="TEXT") %>% 

@@ -24,3 +24,12 @@ adjDBtoType=function(dt){
     .[,Type_Legal:=as.logical(Type_Legal)]
   return(data)
 }
+
+adjType=function(dt){
+  data=melt(dt,measure.vars=c("Type_Natural","Type_Legal"),variable.name="Type") %>% 
+    .[value==T] %>% 
+    .[,!"value"] %>% 
+    .[,Type:=str_replace(Type,"^Type_","")] %>% 
+    setcolorder(c(1,2,3,7,4,5,6))
+  return(data)
+}
