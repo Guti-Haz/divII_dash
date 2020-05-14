@@ -1,44 +1,24 @@
-libs=c("shiny",
-       "RSQLite",
-       "DBI",
-       "magrittr",
-       "data.table",
-       "DT",
-       "stringr",
-       "lubridate",
-       "tibble",
-       "glue",
-       "pool",
-       "rhandsontable")
-lapply(libs,require,character.only=T)
+source("loadLibs.R")
 source("vars.R")
 shinyUI(
     fluidPage(
         h4("Dashboard - Div II"),br(),
         tabsetPanel(id="tabSet",
                     tabPanel("Add",value="add",br(),
-                             radioButtons("add_corr","Correspondence",corr_list),
-                             radioButtons("add_nature","Nature",""),
-                             actionButton("add_button","",icon("plus"),style=css.button)
+                             fluidPage(fluidRow(actionButton("in.req","Incoming request",style=css.button))),br(),
+                             fluidPage(fluidRow(actionButton("out.req","Outgoing request",style=css.button))),br(),
+                             # fluidPage(fluidRow(actionButton("in.spon","Incoming sharing",style=css.button))),br(),
+                             # fluidPage(fluidRow(actionButton("out.spon","Outgoing sharing",style=css.button))),br(),
+                             # fluidPage(fluidRow(actionButton("bulk","Bulk disclosure",style=css.button))),br(),
+                             # fluidPage(fluidRow(actionButton("cv","Character vetting",style=css.button))),br(),
+                             # fluidPage(fluidRow(actionButton("adhoc","Adhoc/Project",style=css.button))),br(),
+                             # fluidPage(fluidRow(actionButton("sr","Suspicious report",style=css.button))),br(),
+                             # fluidPage(fluidRow(actionButton("manualSTR","Manual STR",style=css.button)))
                     ),
                     tabPanel("Task",value="task",br(),
-                             tabsetPanel(id="tabSet2",
-                                         tabPanel(title=uiOutput("title.in_req"),br(),
-                                                  DTOutput("tbl.in_req")
-                                         )
-                             )
-                    ),
-                    tabPanel("View",value="view",br(),
-                             tabsetPanel(id="tabSet3",
-                                         tabPanel("Subject",br(),
-                                                  DTOutput("tbl.view.subject")
-                                         ),
-                                         tabPanel("In_req",br(),
-                                                  DTOutput("tbl.view.in_req")
-                                         ),
-                                         tabPanel("In_req + Out_resp",br(),
-                                                  DTOutput("tbl.view.In_req__Out_resp")
-                                         )
+                             tabsetPanel(id="task_tabSet",
+                                         tabPanel(title=uiOutput("in.req_count"),br(),DTOutput("in.req_DT"),value="in.req"),
+                                         tabPanel(title=uiOutput("out.req_count"),br(),DTOutput("out.req_DT"),value="out.req")
                              )
                     )
         )

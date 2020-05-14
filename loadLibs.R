@@ -1,0 +1,15 @@
+libs=c("rstudioapi",
+       "shiny",
+       "magrittr",
+       "data.table",
+       "DT",
+       "DBI",
+       "RSQLite",
+       "readxl",
+       "stringr",
+       "lubridate",
+       "tibble",
+       "glue",
+       "pool",
+       "rhandsontable")
+lapply(libs,require,character.only=T)

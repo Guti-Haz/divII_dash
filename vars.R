@@ -1,11 +1,17 @@
-corr_list=c("Local LEA",
-            "Foreign FIU",
-            "Special - MLA")
-nature_list=c(`Incoming Request`="in_req",
-              `Outgoing Request`="out_req",
-              `Incoming Spontaneous`="in_spon",
-              `Outgoing Spontaneous`="out_spon") %>% 
-  sort
+prime_start="15-10-2019"
+task_list=c(
+  "Incoming request",
+  "Outgoing request",
+  "Incoming sharing",
+  "Outgoing sharing",
+  "Bulk disclosure",
+  "CV",
+  "Adhoc",
+  "SR",
+  "Manual STR")
+nature_list=c("Domestic",
+              "Egmont",
+              "MLA")
 lea_list=c("IMI",
            "MACC",
            "RMC",
@@ -29,13 +35,13 @@ supervisor_list=c("ALBA",
                   "LWL") %>% 
   sort
 crime=tribble(
-  ~law_provision, ~offence,
-  "Penal Code 1999: 11 - Attempted murder", "Murder",
-  "Income Tax Act 2011: 201 - Willfull evasion", "Tax evasion",
-  "Income Tax Act 2011: 202 - Hiding info", "Tax evasion",
-  "Penal Code 1999: 17 - Initiating bribery act", "Corruption",
-  "Corruption Act 2001: 4 - Accepting gratification", "Corruption",
-  "Corruption Act 2001: 5 - Giving gratification", "Corruption"
+  ~law,~prov, ~offence,
+  "Penal Code 1999","11 - Attempted murder", "Murder",
+  "Income Tax Act 2011","201 - Willfull evasion", "Tax evasion",
+  "Income Tax Act 2011","202 - Hiding info", "Tax evasion",
+  "Penal Code 1999","17 - Initiating bribery act", "Corruption",
+  "Corruption Act 2001","4 - Accepting gratification", "Corruption",
+  "Corruption Act 2001","5 - Giving gratification", "Corruption"
 ) %>% 
   setDT
 offence_list=c("Fraud",
@@ -58,4 +64,6 @@ reason_list=c("No link to Malaysia",
               "No detail of transaction",
               "Phishing")
 css.button="color: #fff; background-color: #337ab7; border-color: #2e6da4;"
-data_name=paste0("data_",as.character(round(runif(1,1e4,1e5),0)),".sqlite")
+css.inline1="display:inline-block;vertical-align:top;"
+css.inline2="display:inline-block;vertical-align:top;margin-top:26px"
+css.inline3="display:inline-block;vertical-align:middle;"
