@@ -5,7 +5,7 @@ genRandom=function(){
 }
 makeButton=function(task,type,ref){
   js=paste0('Shiny.setInputValue(\"',task,"_",type,'_button\",this.id,{priority:"event"})')
-  paste0(type,"_",ref) %>% 
+  paste0(task,"_",type,"_",ref) %>% 
     actionButton(.,label=type,style=css.button,onclick=js) %>% 
     as.character
 }
@@ -33,7 +33,11 @@ errorUI=function(vec){
   {if(length(vec[vec==F])>0) vec[vec==F]} %>% 
     names %>% 
     paste0(collapse=", ") %>%
-    paste0("  Incomplete fields: <font color='red'> <b>",.,"</b></font>") %>% 
+    paste0("  Status: <font color='red'> <b> Incomplete fields (",.,")</b></font>") %>% 
+    HTML
+}
+successUI=function(){
+  paste0("  Status: <font color='blue'> <b> Submitted! </b></font>") %>% 
     HTML
 }
 ingest=function(pool,tbl,data){
@@ -55,4 +59,76 @@ emptyToNA=function(dt){
     set(dt,j=j,value=ifelse(dt[[j]]=="",NA,dt[[j]]))
   }
   return(dt)
+}
+in.req_fx=function(pool,validity,daysElapsed){
+  in_req=setDT(dbReadTable(pool,"in_req")) %>% 
+    .[dmy(Date_received)>=dmy(prime_start)]
+  out_resp=setDT(dbReadTable(pool,"out_resp")) %>% 
+    .[!is.na(RefNum_external)]
+  valid=setDT(dbReadTable(pool,"valid")) %>% 
+    .[!(!is.na(Date_ask)&!is.na(Date_reply))]
+  data=merge(in_req,out_resp,by="RefNum_external",all.x=T) %>% 
+    merge(valid,by="RefNum_external",all.x=T) %>% 
+    setDT %>% 
+    emptyToNA %>% 
+    .[is.na(Date_responsed),Status:=paste0("Pending - ",as.integer(today()-dmy(Date_received))," days elapsed")] %>% 
+    .[!is.na(Date_ask)&is.na(Date_reply),Status:="Invalidated"] %>% 
+    .[is.na(Analyst),a:=sapply(RefNum_external,function(x){makeButton("in.req","assign",x)})] %>%
+    .[Nature=="Egmont"&is.na(Date_responsed),b:=sapply(RefNum_external,function(x){makeButton("in.req","invalidate",x)})] %>%
+    .[Nature=="Egmont"&!is.na(Date_ask)&is.na(Date_responsed),b:=sapply(RefNum_external,function(x){makeButton("in.req","revalidate",x)})] %>%
+    .[Status!="Invalidated",c:=sapply(RefNum_external,function(x){makeButton("in.req","response",x)})] %>%
+    .[!is.na(Status)] %>% 
+    {if (validity) .[Status!="Invalidated"] else .[Status=="Invalidated"]} %>% 
+    .[as.integer(today()-dmy(Date_received))>=daysElapsed] %>% 
+    .[,Date_received:=dmy(Date_received)] %>% 
+    .[order(-Date_received)] %>% 
+    .[,.(
+      Nature,
+      Partner,
+      RefNum_external,
+      Date_received,
+      Date_responsed,
+      Analyst,
+      Status,
+      a,
+      b,
+      c
+    )]
+  return(data)
+}
+out.req_fx=function(pool){
+  out_req=setDT(dbReadTable(pool,"out_req")) %>% 
+    .[dmy(Date_ask)>=dmy(prime_start)]
+  in_resp=setDT(dbReadTable(pool,"in_resp"))
+  data=setDT(merge(out_req,in_resp,by="RefNum_internal",all.x=T)) %>% 
+    emptyToNA %>% 
+    .[is.na(Date_reply),Status:=paste0("Pending - ",as.integer(today()-dmy(Date_ask))," days elapsed")] %>%
+    .[is.na(Date_reply),a:=sapply(RefNum_internal,function(x){makeButton("out.req","response",x)})] %>%
+    .[!is.na(Status)] %>%
+    .[,Date_ask:=dmy(Date_ask)] %>%
+    .[order(-Date_ask)] %>%
+    .[,.(Partner,
+         RefNum_internal,
+         Date_ask,
+         RefNum_external,
+         Date_reply,
+         Analyst,
+         Status,
+         a)]
+  return(data)
+}
+in.spon_fx=function(pool){
+  data=setDT(dbReadTable(pool,"in_spon")) %>% 
+    .[dmy(Date)>=dmy(prime_start)] %>% 
+    emptyToNA %>% 
+    .[is.na(Analyst),a:=sapply(RefNum_external,function(x){makeButton("in.spon","assign",x)})] %>%
+    .[is.na(Analyst)] %>% 
+    .[,Date:=dmy(Date)] %>% 
+    .[order(-Date)] %>% 
+    .[,.(Partner,
+         RefNum_external,
+         Date,
+         Analyst,
+         a)]
+  return(data)
 }

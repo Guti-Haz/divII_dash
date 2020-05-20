@@ -12,6 +12,8 @@ task_list=c(
 nature_list=c("Domestic",
               "Egmont",
               "MLA")
+nature_list2=c("Domestic",
+              "Egmont")
 lea_list=c("IMI",
            "MACC",
            "RMC",
